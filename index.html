@@ -1,0 +1,126 @@
+#include <LiquidCrystal.h>
+#include <Servo.h>
+
+
+const int pinInterruptor = 10;     // Interruptor deslizante
+const int pinMotorDC = 13;         // Motor CC (Aerogenerador)
+const int pinServo = 9 ;           // Servomotor (Orientación de aspas)
+const int pinTrigger = 7;         // Ultrasonidos Trigger
+const int pinEcho = 6;            // Ultrasonidos Echo
+const int pinSensorHumedad = A1; // Potenciómetro azul (Simulador de temperatura)
+
+//pantalla LCD (Pines: RS, E, D4, D5, D6, D7) ---
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+Servo miServo;
+
+// 
+bool estacionEncendida = false;
+char comandoBluetooth;
+long duracion;
+int distancia;
+int posicionServo = 90; 
+
+void setup() {
+  //iniciar monitor y bluetooth
+  Serial.begin(9600);
+  
+  pinMode(pinInterruptor, INPUT);
+  pinMode(pinMotorDC, OUTPUT);
+  pinMode(pinTrigger, OUTPUT);
+  pinMode(pinEcho, INPUT);
+  
+  miServo.attach(pinServo);
+  miServo.write(posicionServo);
+  
+ //iniciar LCD
+  lcd.begin(16, 2);
+  lcd.clear();
+  lcd.print("Estacion Eolica");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  // interruptormfisico
+  if (digitalRead(pinInterruptor) == HIGH) {
+    estacionEncendida = true;
+  } else {
+    estacionEncendida = false;
+  }
+
+  // control bluetooh/ monitor serie
+  // Envía estas letras en mayúscula desde el monitor de Tinkercad para probar la App:
+  if (Serial.available() > 0) {
+    comandoBluetooth = Serial.read();
+    
+    if (comandoBluetooth == 'A') {      // A Enciende la estación desde el móvil
+      estacionEncendida = true;
+    }
+    else if (comandoBluetooth == 'D') { // D Apaga la estación desde el móvil
+      estacionEncendida = false;
+    }
+    else if (comandoBluetooth == 'I') { // I  Orienta el servo a la izquierda
+      posicionServo = constrain(posicionServo - 15, 0, 180);
+      miServo.write(posicionServo);
+    }
+    else if (comandoBluetooth == 'R') { // R Orienta el servo a la derecha
+      posicionServo = constrain(posicionServo + 15, 0, 180);
+      miServo.write(posicionServo);
+    }
+  }
+
+ 
+  if (estacionEncendida) {
+    // Arrancar el aerogenerador
+    digitalWrite(pinMotorDC, HIGH);
+    
+    // lanza pulso ultrasónico para medir obstáculos
+    digitalWrite(pinTrigger, LOW);
+    delayMicroseconds(2);
+    digitalWrite(pinTrigger, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(pinTrigger, LOW);
+    duracion = pulseIn(pinEcho, HIGH);
+    distancia = duracion * 0.034 / 2;
+    
+    // Mapeao potenciómetro para simular valores del sensor de temperatura y humedad
+    int valorSensor = analogRead(pinSensorHumedad);
+    int temperaturaSimulada = map(valorSensor, 0, 1023, 10, 45); // Rango de 10°C a 45°C
+    int humedadSimulada = map(valorSensor, 0, 1023, 30, 85);     // Rango de 30% a 85%
+    
+    // Alarma Monitor Serie si  obstáculos a menos de 20 cm 
+    if (distancia > 0 && distancia < 20) {
+      Serial.println("¡ALERTA! Obstaculo aereo detectado.");
+    }
+    
+    // Muestra lecturas tiempo real 
+    lcd.setCursor(0, 0);
+    lcd.print("Dist: ");
+    lcd.print(distancia);
+    lcd.print("cm   ");
+    
+    lcd.setCursor(0, 1);
+    lcd.print("T:");
+    lcd.print(temperaturaSimulada);
+    lcd.print("C H:");
+    lcd.print(humedadSimulada);
+    lcd.print("%   ");
+    
+    // Enviar los datos App Inventor 
+    Serial.print(temperaturaSimulada);
+    Serial.print(",");
+    Serial.print(humedadSimulada);
+    Serial.print(",");
+    Serial.println(distancia);
+
+  } else {
+    // Si la estación está en OFF
+    digitalWrite(pinMotorDC, LOW);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Sistema: OFF");
+  }
+
+  delay(400); 
+}
