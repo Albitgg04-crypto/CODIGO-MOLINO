@@ -1,6 +1,7 @@
 #include <LiquidCrystal.h>
 #include <Servo.h>
 #include <DHT.h>
+#include <Wire.h>
 
 const int pinInterruptor = 10;     // Interruptor deslizante
 const int pinMotorDC = 13;         // Motor CC (Aerogenerador)
@@ -9,12 +10,11 @@ const int pinTrigger = 7;         // Ultrasonidos Trigger
 const int pinEcho = 6;            // Ultrasonidos Echo
 const int pinSensorHumedad = A1; // Potenciómetro azul (Simulador de temperatura)
 
-//pantalla LCD (Pines: RS, E, D4, D5, D6, D7) ---
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
-
+//Conectar: SDA -> Pin A4 | SCL -> Pin A5
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+  
 Servo miServo;
 
-// 
 bool estacionEncendida = false;
 char comandoBluetooth;
 long duracion;
@@ -22,7 +22,7 @@ int distancia;
 int posicionServo = 90; 
 
 void setup() {
-  //iniciar monitor y bluetooth
+  //// Iniciar monitor  y Bluetooth (Pines fijos 0 y 1)
   Serial.begin(9600);
   
   pinMode(pinInterruptor, INPUT);
@@ -34,7 +34,8 @@ void setup() {
   miServo.write(posicionServo);
   
  //iniciar LCD
-  lcd.begin(16, 2);
+ lcd.init();                      // Inicializa la pantalla
+  lcd.backlight();
   lcd.clear();
   lcd.print("Estacion Eolica");
   delay(2000);
