@@ -1,4 +1,4 @@
-#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
 #include <Servo.h>
 #include <DHT.h>
 #include <Wire.h>
@@ -8,7 +8,10 @@ const int pinMotorDC = 13;         // Motor CC (Aerogenerador)
 const int pinServo = 9 ;           // Servomotor (Orientación de aspas)
 const int pinTrigger = 7;         // Ultrasonidos Trigger
 const int pinEcho = 6;            // Ultrasonidos Echo
-const int pinSensorHumedad = A1; // Potenciómetro azul (Simulador de temperatura)
+const int pinDHT = 14; // Potenciómetro azul (Simulador de temperatura)
+
+#define DHTTYPE DHT11              
+DHT dht(pinDHT, DHTTYPE);// Creamos el objeto del sensor real
 
 //Conectar: SDA -> Pin A4 | SCL -> Pin A5
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -24,6 +27,7 @@ int posicionServo = 90;
 void setup() {
   //// Iniciar monitor  y Bluetooth (Pines fijos 0 y 1)
   Serial.begin(9600);
+  dht.begin();
   
   pinMode(pinInterruptor, INPUT);
   pinMode(pinMotorDC, OUTPUT);
@@ -85,10 +89,15 @@ void loop() {
     duracion = pulseIn(pinEcho, HIGH);
     distancia = duracion * 0.034 / 2;
     
-    // Mapeao potenciómetro para simular valores del sensor de temperatura y humedad
-    int valorSensor = analogRead(pinSensorHumedad);
-    int temperaturaSimulada = map(valorSensor, 0, 1023, 10, 45); // Rango de 10°C a 45°C
-    int humedadSimulada = map(valorSensor, 0, 1023, 30, 85);     // Rango de 30% a 85%
+    int temperaturaReal = dht.readTemperature(); // Lee la temperatura en ºC
+    int humedadReal = dht.readHumidity();       // Lee la humedad relativa %
+    
+    //  cumprueba si la lectura falló
+    if (isnan(temperaturaReal) || isnan(humedadReal)) {
+      Serial.println("¡Fallo al leer del sensor DHT!");
+      temperaturaReal = 0; // Valores por defecto si falla
+      humedadReal = 0;
+    }
     
     // Alarma Monitor Serie si  obstáculos a menos de 20 cm 
     if (distancia > 0 && distancia < 20) {
@@ -103,15 +112,15 @@ void loop() {
     
     lcd.setCursor(0, 1);
     lcd.print("T:");
-    lcd.print(temperaturaSimulada);
+    lcd.print(temperaturaReal);
     lcd.print("C H:");
-    lcd.print(humedadSimulada);
+    lcd.print(humedadReal);
     lcd.print("%   ");
     
     // Enviar los datos App Inventor 
-    Serial.print(temperaturaSimulada);
+    Serial.print(temperaturaReal);
     Serial.print(",");
-    Serial.print(humedadSimulada);
+    Serial.print(humedadReal);
     Serial.print(",");
     Serial.println(distancia);
 
